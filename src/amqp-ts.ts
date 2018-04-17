@@ -343,26 +343,35 @@ export class Message {
     return content;
   }
 
-  sendTo(destination: Exchange | Queue, routingKey: string = ""): void {
+  sendTo(destination: Exchange | Queue, routingKey: string = ""): Promise<any> {
     // inline function to send the message
     var sendMessage = () => {
-      try {
-        destination._channel.publish(exchange, routingKey, this.content, this.properties);
-      } catch (err) {
-        log.log("debug", "Publish error: " + err.message, { module: "amqp-ts" });
-        var destinationName = destination._name;
-        var connection = destination._connection;
-        log.log("debug", "Try to rebuild connection, before Call.", { module: "amqp-ts" });
-        connection._rebuildAll(err).then(() => {
-          log.log("debug", "Retransmitting message.", { module: "amqp-ts" });
-          if (destination instanceof Queue) {
-            connection._queues[destinationName].publish(this.content, this.properties);
-          } else {
-            connection._exchanges[destinationName].publish(this.content, routingKey, this.properties);
-          }
-
-        });
-      }
+      return new Promise((resolve, reject) => {
+        try {
+          destination._channel.publish(exchange, routingKey, this.content, this.properties)
+            .then(resolve)
+            .catch((e) => {
+              throw e;
+            });
+        } catch (err) {
+          exports.log.log("debug", "Publish error: " + err.message, { module: "amqp-ts" });
+          var destinationName = destination._name;
+          var connection = destination._connection;
+          exports.log.log("debug", "Try to rebuild connection, before Call.", { module: "amqp-ts" });
+          connection._rebuildAll(err).then(() => {
+            exports.log.log("debug", "Retransmitting message.", { module: "amqp-ts" });
+            if (destination instanceof Queue) {
+              connection._queues[destinationName].publish(this.content, this.properties)
+                .then(resolve)
+                .catch(reject);
+            } else {
+              connection._exchanges[destinationName].publish(this.content, routingKey, this.properties)
+                .then(resolve)
+                .catch(reject);
+            }
+          });
+        }
+      });
     };
 
     var exchange: string;
@@ -375,9 +384,9 @@ export class Message {
 
     // execute sync when possible
     if (destination.initialized.isFulfilled()) {
-      sendMessage();
+      return sendMessage();
     } else {
-      (<Promise<any>>destination.initialized).then(sendMessage);
+      return (<Promise<any>>destination.initialized).then(sendMessage);
     }
   }
 
@@ -466,30 +475,30 @@ export class Exchange {
   /**
    * deprecated, use 'exchange.send(message: Message)' instead
    */
-  publish(content: any, routingKey = "", options: any = {}): void {
+  publish(content: any, routingKey = "", options: any = {}): Promise<any> {
     if (typeof content === "string") {
       content = new Buffer(content);
     } else if (!(content instanceof Buffer)) {
       content = new Buffer(JSON.stringify(content));
       options.contentType = options.contentType || "application/json";
     }
-    this.initialized.then(() => {
+    return this.initialized.then(() => {
       try {
-        this._channel.publish(this._name, routingKey, content, options);
+        return this._channel.publish(this._name, routingKey, content, options);
       } catch (err) {
         log.log("warn", "Exchange publish error: " + err.message, { module: "amqp-ts" });
         var exchangeName = this._name;
         var connection = this._connection;
-        connection._rebuildAll(err).then(() => {
+        return connection._rebuildAll(err).then(() => {
           log.log("debug", "Retransmitting message.", { module: "amqp-ts" });
-          connection._exchanges[exchangeName].publish(content, routingKey, options);
+          return connection._exchanges[exchangeName].publish(content, routingKey, options);
         });
       }
     });
   }
 
-  send(message: Message, routingKey = ""): void {
-    message.sendTo(this, routingKey);
+  send(message: Message, routingKey = ""): Promise<any> {
+    return message.sendTo(this, routingKey);
   }
 
   rpc(requestParameters: any, routingKey = ""): Promise<Message> {
@@ -749,19 +758,19 @@ export class Queue {
   /**
    * deprecated, use 'queue.send(message: Message)' instead
    */
-  publish(content: any, options: any = {}): void {
+  publish(content: any, options: any = {}): Promise<any> {
     // inline function to send the message
     var sendMessage = () => {
       try {
-        this._channel.sendToQueue(this._name, content, options);
+        return Promise.resolve(this._channel.sendToQueue(this._name, content, options));
       } catch (err) {
         log.log("debug", "Queue publish error: " + err.message, { module: "amqp-ts" });
         var queueName = this._name;
         var connection = this._connection;
         log.log("debug", "Try to rebuild connection, before Call.", { module: "amqp-ts" });
-        connection._rebuildAll(err).then(() => {
+        return connection._rebuildAll(err).then(() => {
           log.log("debug", "Retransmitting message.", { module: "amqp-ts" });
-          connection._queues[queueName].publish(content, options);
+          return connection._queues[queueName].publish(content, options);
         });
       }
     };
@@ -769,9 +778,9 @@ export class Queue {
     content = Queue._packMessageContent(content, options);
     // execute sync when possible
     if (this.initialized.isFulfilled()) {
-      sendMessage();
+      return sendMessage();
     } else {
-      this.initialized.then(sendMessage);
+      return this.initialized.then(sendMessage);
     }
   }
 

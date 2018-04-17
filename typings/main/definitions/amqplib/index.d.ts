@@ -98,6 +98,7 @@ export * from '~amqplib/properties';
 declare module '~amqplib/callback_api' {
 import events = require('events');
 import shared = require('~amqplib/properties')
+import when = require('when');
 
 export import Replies = shared.Replies;
 export import Options = shared.Options;
@@ -129,8 +130,8 @@ export interface Channel extends events.EventEmitter {
     bindExchange(destination: string, source: string, pattern: string, args?: any, callback?: (err: any, ok: Replies.Empty) => void): void;
     unbindExchange(destination: string, source: string, pattern: string, args?: any, callback?: (err: any, ok: Replies.Empty) => void): void;
 
-    publish(exchange: string, routingKey: string, content: Buffer, options?: Options.Publish): boolean;
-    sendToQueue(queue: string, content: Buffer, options?: Options.Publish): boolean;
+    publish(exchange: string, routingKey: string, content: Buffer, options?: Options.Publish): when.Promise<any>;
+    sendToQueue(queue: string, content: Buffer, options?: Options.Publish): when.Promise<any>;
 
     consume(queue: string, onMessage: (msg: Message) => any, options?: Options.Consume, callback?: (err: any, ok: Replies.Consume) => void): void;
 
@@ -149,8 +150,8 @@ export interface Channel extends events.EventEmitter {
 }
 
 export interface ConfirmChannel extends Channel {
-    publish(exchange: string, routingKey: string, content: Buffer, options?: Options.Publish, callback?: (err: any, ok: Replies.Empty) => void): boolean;
-    sendToQueue(queue: string, content: Buffer, options?: Options.Publish, callback?: (err: any, ok: Replies.Empty) => void): boolean;
+    publish(exchange: string, routingKey: string, content: Buffer, options?: Options.Publish, callback?: (err: any, ok: Replies.Empty) => void): when.Promise<any>;
+    sendToQueue(queue: string, content: Buffer, options?: Options.Publish, callback?: (err: any, ok: Replies.Empty) => void): when.Promise<any>;
 
     waitForConfirms(callback?: (err: any) => void): void;
 }
@@ -201,8 +202,8 @@ export interface Channel extends events.EventEmitter {
     bindExchange(destination: string, source: string, pattern: string, args?: any): when.Promise<Replies.Empty>;
     unbindExchange(destination: string, source: string, pattern: string, args?: any): when.Promise<Replies.Empty>;
 
-    publish(exchange: string, routingKey: string, content: Buffer, options?: Options.Publish): boolean;
-    sendToQueue(queue: string, content: Buffer, options?: Options.Publish): boolean;
+    publish(exchange: string, routingKey: string, content: Buffer, options?: Options.Publish): when.Promise<any>;
+    sendToQueue(queue: string, content: Buffer, options?: Options.Publish): when.Promise<any>;
 
     consume(queue: string, onMessage: (msg: Message) => any, options?: Options.Consume): when.Promise<Replies.Consume>;
 
