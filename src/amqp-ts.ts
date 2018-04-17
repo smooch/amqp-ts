@@ -347,31 +347,24 @@ export class Message {
     // inline function to send the message
     var sendMessage = () => {
       return new Promise((resolve, reject) => {
-        try {
-          destination._channel.publish(exchange, routingKey, this.content, this.properties)
-            .then(resolve)
-            .catch((e) => {
-              throw e;
-            });
-        } catch (err) {
+        destination._channel.publish(exchange, routingKey, this.content, this.properties)
+          .then(resolve, reject);
+      })
+        .catch((err) => {
           exports.log.log("debug", "Publish error: " + err.message, { module: "amqp-ts" });
           var destinationName = destination._name;
           var connection = destination._connection;
           exports.log.log("debug", "Try to rebuild connection, before Call.", { module: "amqp-ts" });
+
           connection._rebuildAll(err).then(() => {
             exports.log.log("debug", "Retransmitting message.", { module: "amqp-ts" });
             if (destination instanceof Queue) {
-              connection._queues[destinationName].publish(this.content, this.properties)
-                .then(resolve)
-                .catch(reject);
+              return connection._queues[destinationName].publish(this.content, this.properties);
             } else {
-              connection._exchanges[destinationName].publish(this.content, routingKey, this.properties)
-                .then(resolve)
-                .catch(reject);
+              return connection._exchanges[destinationName].publish(this.content, routingKey, this.properties);
             }
           });
-        }
-      });
+        });
     };
 
     var exchange: string;
