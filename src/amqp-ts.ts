@@ -346,10 +346,7 @@ export class Message {
   sendTo(destination: Exchange | Queue, routingKey: string = ""): Promise<any> {
     // inline function to send the message
     var sendMessage = () => {
-      return new Promise((resolve, reject) => {
-        destination._channel.publish(exchange, routingKey, this.content, this.properties)
-          .then(resolve, reject);
-      })
+      return Promise.resolve().then(() => destination._channel.publish(exchange, routingKey, this.content, this.properties))
         .catch((err) => {
           exports.log.log("debug", "Publish error: " + err.message, { module: "amqp-ts" });
           var destinationName = destination._name;
